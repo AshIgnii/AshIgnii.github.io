@@ -1,161 +1,195 @@
-import { shuffle, square, createMatrix, getMouse } from "./utils.js";
-import { Draw } from "./render.js";
-import { updateGravity } from "./physics.js";
-import { sand } from "./types.js";
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext("2d");
+let densityInput = document.getElementById('density');
+let strokeSizeInput = document.getElementById('stroke');
+let strokeNumber = document.getElementById('strokeNumber');
 
-const width = 100;
-const height = 100;
-const strokeSize = 10;
+let height = 100;
+let width = 100;
+let strokeSize = 20;
+let gravity = { x: 1, y: 1 };
+
+function createMatrix(width, height) {
+    let matrix = new Array(width);
+    for (let i = 0; i < height; i++) {
+        let collumn = new Array(height);
+
+        for (let i = 0; i < collumn.length; i++) {
+            collumn[i] = 0;
+        }
+
+        matrix[i] = collumn;
+    }
+
+    return matrix;
+}
 
 let matrix = createMatrix(width, height);
 
 function update() {
     let newMatrix = createMatrix(width, height);
-    let fragments = [];
-
     for (let x = 0; x < matrix.length; x++) {
         for (let y = 0; y < matrix[x].length; y++) {
-            if (matrix[x][y] != null) {
-                fragments.push(matrix[x][y]);
+            if (matrix[x][y] === 1) {
+                let newX = x + gravity.x;
+                let newY = y + gravity.y;
+
+                if (newX >= 0 && newX < width && newY >= 0 && newY < height && matrix[newX][newY] === 0) {
+                    newMatrix[newX][newY] = 1;
+                } else {
+                    newMatrix[x][y] = 1;
+                }
             }
-        }
-    }
-
-    shuffle(fragments);
-
-    for (let frag of fragments) {
-        let material = frag.material;
-
-        frag.mX = frag.mX || 0;
-        frag.mY = frag.mY || 0;
-
-        frag.mX = Math.max(Math.min(frag.mX + material.mass * material.gravDir.x, material.maxSpeed), -material.maxSpeed); //Desired X Position
-        frag.mY = Math.max(Math.min(frag.mY + material.mass * material.gravDir.y, material.maxSpeed), -material.maxSpeed); //Desired Y Position
-
-        let nextX = frag.x + frag.mX;
-        let nextY = frag.y + frag.mY;
-
-
-        // Check diagonal collision
-        if (matrix[nextX] != null && matrix[nextX][nextY] != null) {
-            /*
-            if (Math.random() > 0.5) {
-                nextX = frag.x;
-                frag.mX = 0;
-            } else {
-                nextY = frag.y;
-                frag.mY = 0;
-            }
-            */
-            nextX = frag.x;
-            frag.mX = 0;
-            nextY = frag.y;
-            frag.mY = 0;
-        }
-
-        let oldX = frag.x;
-        let oldY = frag.y;
-
-        // Check X collision
-        if (nextX >= width || nextX < 0 || (matrix[nextX] && matrix[nextX][oldY] != null)) {
-            nextX = frag.x;
-            frag.mX = 0;
-        } else {
-            frag.x = nextX;
-        }
-
-        // Check Y collision
-        if (nextY >= height || nextY < 0 || (matrix[oldX] && matrix[oldX][nextY] != null)) {
-            nextY = frag.y;
-            frag.mY = 0;
-        } else {
-            frag.y = nextY;
-        }
-
-
-        frag.x = Math.max(Math.min(nextX, width - 1), 0);
-        frag.y = Math.max(Math.min(nextY, height - 1), 0);
-
-        if (newMatrix [frag.x] && newMatrix[frag.x][frag.y] == null) {
-            newMatrix[frag.x][frag.y] = frag;
-        } else {
-            frag.x = oldX;
-            frag.y = oldY;
-            newMatrix[oldX][oldY] = frag;
         }
     }
 
     matrix = newMatrix;
 
-    //Draw
-    Draw(matrix, canvas, width, height);
+    for (let x = 0; x < matrix.length; x++) {
+        for (let y = 0; y < matrix[x].length; y++) {
+            switch (matrix[x][y]) {
+                case 0:
+                    ctx.fillStyle = 'white';
+                    break;
+                case 1:
+                    ctx.fillStyle = 'black';
+                    break;
+            }
+            ctx.fillRect(x * (canvas.width / width), y * (canvas.height / height), canvas.width / width, canvas.height / height);
+        }
+    }
 }
 
-// Canvas click event
+function square(x, y, size) {
+    let cornerX = x - size / 2;
+    let cornerY = y - size / 2;
+
+    for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+            let coordX = Math.max(Math.min(Math.round(cornerX + i), width - 1), 0);
+            let coordY = Math.max(Math.min(Math.round(cornerY + j), height - 1), 0);
+
+            matrix[coordX][coordY] = 1;
+        }
+    }
+}
+
+function getMouse(element, e) {
+    var rect = element.getBoundingClientRect();
+    return [e.clientX - rect.left, e.clientY - rect.top];
+}
+
 canvas.addEventListener('click', (e) => {
     let [mX, mY] = getMouse(canvas, e);
 
-    // Normalize to set width x height
     mX = Math.min(Math.round((mX / canvas.width) * width), width - 1);
-    mY = Math.min(Math.round((mY / canvas.height) * height), height - 1);
+    mY = Math.min(Math.round((mY / canvas.width) * height), height - 1);
 
-    square(mX, mY, strokeSize, matrix, width, height, sand);
+    square(mX, mY, strokeSize);
 })
 
-// Keyboard
-export let keys = {
-    ArrowUp: false,
-    ArrowDown: false,
-    ArrowLeft: false,
-    ArrowRight: false
-};
+canvas.addEventListener('mousemove', (e) => {
+    let mX = e.clientX;
+    let mY = e.clientY;
+    
+    mX -= strokeSize * (canvas.width / width) / 2;
+    mY -= strokeSize * (canvas.height / height) / 2;
+
+    let strokeIndicators = document.getElementsByClassName('strokeIndicator');
+    for (let i = 0; i < strokeIndicators.length; i++) {
+        strokeIndicators[i].style.display = 'block';
+        strokeIndicators[i].style.left = mX + 'px';
+        strokeIndicators[i].style.top = mY + 'px';
+        strokeIndicators[i].style.width = (strokeSize * (canvas.width / width)) + 'px';
+        strokeIndicators[i].style.height = (strokeSize * (canvas.height / height)) + 'px';
+    }
+})
+
+canvas.addEventListener('mouseleave', (e) => {
+    let strokeIndicators = document.getElementsByClassName('strokeIndicator');
+    for (let i = 0; i < strokeIndicators.length; i++) {
+        strokeIndicators[i].style.display = 'none';
+    }
+})
+
+canvas.addEventListener('wheel', (e) => {
+    strokeSize += Math.sign(e.deltaY);
+    strokeSize = Math.max(1, strokeSize);
+    strokeSize = Math.min(height, strokeSize);
+
+    let mX = e.clientX;
+    let mY = e.clientY;
+    
+    mX -= strokeSize * (canvas.width / width) / 2;
+    mY -= strokeSize * (canvas.height / height) / 2;
+
+    let strokeIndicators = document.getElementsByClassName('strokeIndicator');
+    for (let i = 0; i < strokeIndicators.length; i++) {
+        strokeIndicators[i].style.display = 'block';
+        strokeIndicators[i].style.left = mX + 'px';
+        strokeIndicators[i].style.top = mY + 'px';
+        strokeIndicators[i].style.width = (strokeSize * (canvas.width / width)) + 'px';
+        strokeIndicators[i].style.height = (strokeSize * (canvas.height / height)) + 'px';
+    }
+})
 
 document.addEventListener('keydown', (e) => {
-    if (e.key in keys) {
-        switch (e.key) {
-            case 'ArrowUp':
-                if (keys.ArrowDown) {
-                    keys.ArrowDown = false;
-                    keys.ArrowUp = false;
-                } else {
-                    keys.ArrowUp = true;
-                }
-                break;
-            case 'ArrowDown':
-                if (keys.ArrowUp) {
-                    keys.ArrowUp = false;
-                    keys.ArrowDown = false;
-                } else {
-                    keys.ArrowDown = true;
-                }
-                break;
-            case 'ArrowLeft':
-                if (keys.ArrowRight) {
-                    keys.ArrowRight = false;
-                    keys.ArrowLeft = false;
-                } else {
-                    keys.ArrowLeft = true;
-                }
-                break;
-            case 'ArrowRight':
-                if (keys.ArrowLeft) {
-                    keys.ArrowLeft = false;
-                    keys.ArrowRight = false;
-                } else {
-                    keys.ArrowRight = true;
-                }
-                break;
-        }
+    switch (e.key) {
+        case 'ArrowUp':
+            if (gravity.y > -1) {
+                gravity.y--;
+            }
+            break;
+        case 'ArrowDown':
+            if (gravity.y < 1) {
+                gravity.y++;
+            }
+            break;
+        case 'ArrowLeft':
+            if (gravity.x > -1) {
+                gravity.x--;
+            }
+            break;
+        case 'ArrowRight':
+            if (gravity.x < 1) {
+                gravity.x++;
+            }
+            break;
     }
-});
 
-// Loop
+    updateGravArrow();
+})
+
+densityInput.addEventListener('input', updateDensity);
+
+function updateGravArrow() {
+    let arrow = document.getElementById('gravityArrow').children[2];
+    let circle = document.getElementById('gravityArrow').children[1];
+    if (gravity.x === 0 && gravity.y === 0) {
+        circle.style.display = '';
+        arrow.style.display = 'none';
+    } else {
+        circle.style.display = 'none';
+        arrow.style.display = '';
+
+        let angle = (Math.atan2(gravity.y, gravity.x) * 180 / Math.PI) + 90;
+        arrow.setAttribute('transform', `rotate(${angle}, 25, 25)`);
+    }
+}
+
+function updateDensity() {
+    height = parseInt(densityInput.value);
+    width = parseInt(densityInput.value);
+
+    matrix = createMatrix(width, height);
+}
+
+
+//Loop
+updateGravArrow();
 window.requestAnimationFrame(gameLoop);
 
 function gameLoop() {
-    setTimeout(() => {
-        updateGravity(matrix, keys);
-        update();
-        window.requestAnimationFrame(gameLoop);
-    }, 20);
+    update();
+    window.requestAnimationFrame(gameLoop);
 }
