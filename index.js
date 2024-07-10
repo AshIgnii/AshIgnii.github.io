@@ -7,7 +7,7 @@ let strokeNumber = document.getElementById('strokeNumber');
 let height = 100;
 let width = 100;
 let strokeSize = 20;
-let gravity = { x: 1, y: 1 };
+let gravity = { x: 0, y: 1 };
 
 function createMatrix(width, height) {
     let matrix = new Array(width);
